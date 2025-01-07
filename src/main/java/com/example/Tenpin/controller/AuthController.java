@@ -56,4 +56,74 @@ public class AuthController {
                 "userInfo", userInfo
         ));
     }
+
+    @Operation(summary = "카카오 로그인 Callback", description = "카카오 로그인 완료 후 Authorization Code를 수신합니다.")
+    @GetMapping("/kakao/callback")
+    public ResponseEntity<String> kakaoCallback(@RequestParam("code") String code) {
+        return ResponseEntity.ok("Authorization Code received: " + code);
+    }
+
+    @PostMapping("/kakao/token")
+    public ResponseEntity<Map<String, Object>> getKakaoToken(@RequestBody Map<String, String> request) {
+        String code = request.get("code"); // Authorization Code
+
+        String body = String.format(
+                "grant_type=authorization_code&client_id=%s&redirect_uri=%s&code=%s",
+                "1831e1a8b72bcab5c73a684fcaaf4d6a", // REST API 키
+                "http://localhost:8080/api/auth/kakao/callback", // Redirect URI
+                code
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        HttpEntity<String> entity = new HttpEntity<>(body, headers);
+        RestTemplate restTemplate = new RestTemplate();
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    "https://kauth.kakao.com/oauth/token",
+                    HttpMethod.POST,
+                    entity,
+                    Map.class
+            );
+
+            // Access Token 반환
+            return ResponseEntity.ok(response.getBody());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "Failed to get Access Token",
+                    "details", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/kakao/userinfo")
+    public ResponseEntity<Map<String, Object>> getUserInfo(@RequestHeader("Authorization") String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        RestTemplate restTemplate = new RestTemplate();
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    "https://kapi.kakao.com/v2/user/me",
+                    HttpMethod.GET,
+                    entity,
+                    Map.class
+            );
+
+            // 사용자 정보 반환
+            return ResponseEntity.ok(response.getBody());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "Failed to get User Info",
+                    "details", e.getMessage()
+            ));
+        }
+    }
+
+
+
 }
